@@ -35,7 +35,7 @@ cd preseed
 cp $build_root/resources/preseed/pi.seed .
 
 
-mkdir raspberry
+mkdir -p raspberry
 cd raspberry
 
 
@@ -46,7 +46,7 @@ cp $build_root/resources/preseed/raspberry/pi_partman_command .
 cp $build_root/resources/preseed/raspberry/pi_late_command .
 
 # Download wifi firmware
-mkdir wifi-firmware
+mkdir -p wifi-firmware
 cd wifi-firmware
 # Pi 3B
 wget https://github.com/RPi-Distro/firmware-nonfree/raw/master/brcm/brcmfmac43430-sdio.bin
@@ -58,15 +58,17 @@ wget https://github.com/RPi-Distro/firmware-nonfree/raw/master/brcm/brcmfmac4345
 
 # Download raspi2 kernel debs (these probably should be saved in pool)
 cd ..
-mkdir kernel-debs
+mkdir -p kernel-debs
 cd kernel-debs
 
-echo "$variable" | while IFS= read -r line;
-	do wget -N "http://ports.ubuntu.com/ubuntu-ports/pool/universe/l/linux-raspi2/$line";
+for i in "${linux_packages[@]}"
+do
+	 wget -N "http://ports.ubuntu.com/ubuntu-ports/pool/universe/l/linux-raspi2/$i";
+	 # Extract vmlinuz-raspi2 and dtb files
+	 dpkg-deb -x $1 /tmp/pi-kernel
 done
 
-# Extract vmlinuz-raspi2 and dtb files
-dpkg-deb -x *.deb /tmp/pi-kernel
+# dpkg-deb -x *.deb /tmp/pi-kernel
 cd ../../../
 version="$(ls /tmp/pi-kernel/boot/vmlinuz* | sed 's,^\/tmp\/pi-kernel\/boot\/vmlinuz-,,g')"
 cp /tmp/pi-kernel/lib/firmware/$version/device-tree/broadcom/bcm2710*.dtb .
