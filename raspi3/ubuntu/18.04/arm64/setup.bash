@@ -65,7 +65,7 @@ for i in "${linux_packages[@]}"
 do
 	 wget -N "http://ports.ubuntu.com/ubuntu-ports/pool/universe/l/linux-raspi2/$i";
 	 # Extract vmlinuz-raspi2 and dtb files
-	 dpkg-deb -x $1 /tmp/pi-kernel
+	 dpkg-deb -x $i /tmp/pi-kernel
 done
 
 # dpkg-deb -x *.deb /tmp/pi-kernel
