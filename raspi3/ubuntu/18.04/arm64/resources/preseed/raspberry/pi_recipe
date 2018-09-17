@@ -1,0 +1,21 @@
+raspberrypi ::
+
+128 128 128 fat32
+	$primary{ }
+	$bootable{ }
+	method{ format }
+	format{ }
+	use_filesystem{ }
+	filesystem{ fat32 }
+	label{ pi-boot }
+	mountpoint{ /boot/firmware } .
+
+900 10000 -1 $default_filesystem
+	$lvmok{ }
+	$primary{ }
+	method{ format }
+	format{ }
+	use_filesystem{ }
+	$default_filesystem{ }
+	label{ pi-rootfs }
+	mountpoint{ / } .

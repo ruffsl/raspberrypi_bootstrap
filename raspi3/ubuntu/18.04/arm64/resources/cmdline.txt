@@ -1,0 +1,1 @@
+file=/cdrom/preseed/pi.seed --- quiet net.ifnames=0 dwc_otg.lpm_enable=0 modprobe.blacklist=sdhci_iproc

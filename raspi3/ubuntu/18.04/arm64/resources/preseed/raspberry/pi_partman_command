@@ -1,0 +1,15 @@
+#!/bin/sh
+# Remove partman options that aren't suitable for the pi bootloader
+
+set -e
+
+# Replace option creates duplicate boot partitions so just get rid
+rm -r /lib/partman/automatically_partition/25replace || true
+
+# We don't have the ability to select an os like you can with grub2 etc
+rm -r /lib/partman/automatically_partition/10resize_use_free || true
+
+# Disable flash-kernel-installer
+echo "#!/bin/sh" > /var/lib/dpkg/info/flash-kernel-installer.isinstallable
+echo "exit 1" >> /var/lib/dpkg/info/flash-kernel-installer.isinstallable
+chmod +x /var/lib/dpkg/info/flash-kernel-installer.isinstallable

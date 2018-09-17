@@ -1,0 +1,27 @@
+# Ignore "no kernel modules were found for this kernel"
+d-i anna/no_kernel_modules boolean true
+
+# The partitioning scheme to be used
+d-i partman-partitioning/default_label select msdos
+d-i partman-auto/expert_recipe_file string /cdrom/preseed/raspberry/pi_recipe
+
+# Maximum size of swapfile in MiB
+d-i partman-swapfile/size string 1024
+
+# Maximum percentage of free space to use for swapfile
+d-i partman-swapfile/percentage text 10
+
+# Kernel options to be used for the insalled system (added to those used with the installer)
+d-i debian-installer/add-kernel-opts string elevator=deadline rootwait ro
+
+# We'll use the pi's own bootloader
+d-i grub-installer/skip boolean true
+
+# Don't pause for the "No boot loader installed" message
+d-i nobootloader/confirmation_common note
+
+# Setup fat firmware partition (replicates the work of flash-kernel-installer)
+d-i preseed/late_command string /cdrom/preseed/raspberry/pi_late_command
+
+# Adjust installer options for the pi
+d-i partman/early_command string /cdrom/preseed/raspberry/pi_partman_command

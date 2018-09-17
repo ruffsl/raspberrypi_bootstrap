@@ -1,0 +1,22 @@
+# For more options and information see:
+# https://www.raspberrypi.org/documentation/configuration/config-txt/README.md
+
+# Kernel and initramfs
+kernel=install/vmlinuz-raspi2
+initramfs install/initrd-raspi2.gz followkernel
+
+# boot in AArch64 (64-bit) mode
+arm_64bit=1
+
+[pi2]
+# there is no dtb file for the pi2; using the pi3's file seems to be the done thing
+device_tree=bcm2710-rpi-3-b.dtb
+[all]
+
+# Please note:
+#   To use overlays, the overlays folder must be copied from
+#   /lib/firmware/4.XX.X-XXXX-raspi2/device-tree/
+#   !This is not automatically updated by the flash-kernel pacakge!
+
+# Enable audio (loads snd_bcm2835)
+dtparam=audio=on

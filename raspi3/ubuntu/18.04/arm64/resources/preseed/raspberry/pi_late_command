@@ -1,0 +1,131 @@
+#!/bin/sh
+# Install Raspberry Pi firmware.  Written by Adam Smith
+#
+# (Some bits are borrowed from flash-kernel-installer)
+
+set -e
+
+findfs () {
+	mount | grep "on /target${1%/} " | tail -n1 | cut -d' ' -f1
+}
+
+# Check if the installer diverted update-initramfs, revert before we move on
+if [ -e /target/usr/sbin/update-initramfs.flash-kernel-diverted ];then
+	logger -t late_command "Removing update-initramfs diversion"
+	rm -f /target/usr/sbin/update-initramfs
+	in-target dpkg-divert --remove --local --rename /usr/sbin/update-initramfs
+fi
+
+logger -t late_command "Installing raspi2 kernel"
+
+# We don't want flash-kernel run before the database is updated
+chroot /target dpkg-divert --divert /usr/sbin/flash-kernel.real --rename /usr/sbin/flash-kernel
+
+# Install the raspi2 kernel
+mount -o bind /dev /target/dev
+if ! apt-install linux-raspi2; then
+	# Fallback to cdrom debs
+	debs=""
+	for i in /cdrom/preseed/raspberry/kernel-debs/*.deb ; do
+		debs="$debs /media/$i"
+	done
+	in-target dpkg -i $debs
+fi
+umount /target/dev || true
+
+logger -t late_command "Removing generic kernel"
+
+old_kernel="$(readlink /target/boot/vmlinuz.old | sed 's,^vmlinuz-,,g')"
+in-target apt-get --autoremove --yes purge linux-generic linux-image-generic linux-headers-generic linux-image-$old_kernel linux-headers-$old_kernel linux-modules-$old_kernel linux-modules-extra-$old_kernel
+
+logger -t success_command "Copying wifi firmware"
+
+# Copy wifi-firmware and ensure it is not overwritten
+# !Users will have to manually update!
+for i in /cdrom/preseed/raspberry/wifi-firmware/*sdio* ; do
+	[ -f "$i" ] || continue
+	chroot /target dpkg-divert --divert "/lib/firmware/brcm/$(basename "$i").bak" --rename "/lib/firmware/brcm/$(basename "$i")"
+	cp "$i" /target/lib/firmware/brcm/
+	chmod 644 "/target/lib/firmware/brcm/$(basename "$i")"
+done
+
+# The Pi doesn't have a parallel port
+if [ -e  /target/etc/modules-load.d/cups-filters.conf ];then
+	logger -t late_command "Removing cups-filters.conf"
+	rm /target/etc/modules-load.d/cups-filters.conf
+fi
+
+logger -t late_command "Copying bootloader files"
+
+# If the correct mount points are used there should already be a firmware directory
+mkdir -p /target/boot/firmware/
+
+# Copy bootloader files
+cp /cdrom/bootcode.bin /target/boot/firmware/
+cp /cdrom/fixup*.dat /target/boot/firmware/
+cp /cdrom/start*.elf /target/boot/firmware/
+cp /cdrom/config.txt /target/boot/firmware/
+
+# Update config.txt
+sed -i 's/^kernel=.*/kernel=vmlinuz/g' /target/boot/firmware/config.txt
+sed -i 's/^initramfs .*/initramfs initrd.img followkernel/g' /target/boot/firmware/config.txt
+
+# Create cmdline.txt file
+user_params="$(echo $(user-params))" || true
+vol_id=$(blkid -o value -s UUID $(findfs /))
+echo "root=UUID=$vol_id $user_params" > /target/boot/firmware/cmdline.txt
+
+logger -t late_command "Running flash-kernel ..."
+
+# Remove flash-kernel diversion
+chroot /target dpkg-divert --rename --remove /usr/sbin/flash-kernel
+
+# Install flash-kernel if it hasn't already been
+if ! apt-install flash-kernel u-boot-tools; then
+	logger -t late_command "error: apt-install flash-kernel u-boot-tools failed"
+	exit 1
+fi
+
+# Check flash-kernel databases and add entry if necessary
+machine="$(cat /proc/device-tree/model)"
+if ! { grep -q "$machine" /target/usr/share/flash-kernel/db/all.db || grep -q "$machine" /target/etc/flash-kernel/db; } || \
+	echo "$machine" | grep -q "Raspberry Pi 2"; then
+		# Make a guess about the dtb file to use
+		case "$machine" in
+			'Raspberry Pi 2 Model B'*)
+				# In arm64 there is no dtb file for the pi2; using the pi3's file seems to be the done thing
+				dtb="bcm2710-rpi-3-b.dtb"
+			;;
+			'Raspberry Pi 3 Model B Plus'*)
+				dtb="bcm2710-rpi-3-b-plus.dtb"
+			;;
+			'Raspberry Pi 3 Model B'*)
+				dtb="bcm2710-rpi-3-b.dtb"
+			;;
+			*)
+				logger -t late_command "error: unknown model"
+				exit 1
+		esac
+
+		cat <<EOF >> /target/etc/flash-kernel/db
+
+# Automatically added by the installer
+Machine: $machine
+DTB-Id: $dtb
+Boot-DTB-Path: /boot/firmware/$dtb
+Boot-Kernel-Path: /boot/firmware/vmlinuz
+Boot-Initrd-Path: /boot/firmware/initrd.img
+EOF
+fi
+
+# Use flash-kernel to copy kernel, initrd.img, dtb file, etc to the boot partition
+mount -o bind /dev /target/dev
+if ! in-target flash-kernel; then
+	# Run out of space on boot partition or missing dtb file?
+	logger -t late_command "error: flash-kernel failed"
+	umount /target/dev || true
+	exit 1
+fi
+umount /target/dev || true
+
+logger -t late_command "flash-kernel successful"
