@@ -1,7 +1,7 @@
-#!/bin/sh
+#!/bin/bash
 # Construct a arm64+raspi2 installer.
 
-set -e
+# set -e
 
 source setup.env
 build_root=`pwd`
